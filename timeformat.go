@@ -24,13 +24,26 @@ type brokenTime struct {
 type fieldKind int
 
 const (
-	fieldKind_Str fieldKind = iota
-	fieldKind_Year4
-	fieldKind_Month2
-	fieldKind_Day
-	fieldKind_Hour
-	fieldKind_Minute
-	fieldKind_Second
+	fieldKind_Literal  fieldKind = iota
+	fieldKind_Year4              // 2022
+	fieldKind_Year2              // 22
+	fieldKind_Month              // January
+	fieldKind_Month1             // 1
+	fieldKind_Month2             // 01
+	fieldKind_Month3             // Jan
+	fieldKind_Day                // 1
+	fieldKind_Day2               // 01
+	fieldKind_Hour24             // 15
+	fieldKind_Hour12             // 03
+	fieldKind_Minute             // 5
+	fieldKind_Minute2            // 05
+	fieldKind_Second             // 5
+	fieldKind_Second2            // 05
+	fieldKind_Weekday            // Monday
+	fieldKind_Weekday3           // Mon
+	fieldKind_Weekday1           // 1
+	fieldKind_AMPM               // AM PM
+	fieldKind_ampm               // am pm
 )
 
 type fieldSpec struct {
@@ -41,6 +54,65 @@ type fieldSpec struct {
 type baseFormat struct {
 	format string
 	fields []fieldSpec
+}
+
+var longDayNames = []string{
+	"Sunday",
+	"Monday",
+	"Tuesday",
+	"Wednesday",
+	"Thursday",
+	"Friday",
+	"Saturday",
+}
+
+var shortDayNames = []string{
+	"Sun",
+	"Mon",
+	"Tue",
+	"Wed",
+	"Thu",
+	"Fri",
+	"Sat",
+}
+
+var shortMonthNames = []string{
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec",
+}
+
+var longMonthNames = []string{
+	"January",
+	"February",
+	"March",
+	"April",
+	"May",
+	"June",
+	"July",
+	"August",
+	"September",
+	"October",
+	"November",
+	"December",
+}
+
+func lookup(tab []string, val string) (int, string, error) {
+	for i, v := range tab {
+		if len(val) >= len(v) && val[0:len(v)] == v {
+			return i, val[len(v):], nil
+		}
+	}
+	return -1, val, fmt.Errorf("bad field value")
 }
 
 func (f *baseFormat) Print(t time.Time) string {
@@ -60,19 +132,23 @@ func (f *baseFormat) Print(t time.Time) string {
 func (f *baseFormat) Append(bs []byte, t time.Time) []byte {
 	for _, field := range f.fields {
 		switch field.kind {
-		case fieldKind_Str:
+		case fieldKind_Literal:
 			bs = append(bs, field.name...)
 		case fieldKind_Year4:
 			bs = appendYear(bs, t)
 		case fieldKind_Month2:
 			bs = appendMonth2(bs, t)
-		case fieldKind_Day:
+		case fieldKind_Month3:
+			bs = appendMonth3(bs, t)
+		case fieldKind_Month:
+			bs = appendMonth(bs, t)
+		case fieldKind_Day2:
 			bs = appendMonthDay(bs, t)
-		case fieldKind_Hour:
+		case fieldKind_Hour24:
 			bs = appendHour(bs, t)
-		case fieldKind_Minute:
+		case fieldKind_Minute2:
 			bs = appendMinute(bs, t)
-		case fieldKind_Second:
+		case fieldKind_Second2:
 			bs = appendSecond(bs, t)
 		}
 	}
@@ -112,19 +188,23 @@ func (f baseFormat) parse(value string, bt *brokenTime) error {
 	var err error
 	for _, field := range f.fields {
 		switch field.kind {
-		case fieldKind_Str:
+		case fieldKind_Literal:
 			value, err = parseString(field.name, value)
 		case fieldKind_Year4:
 			value, err = parseYear(value, bt)
 		case fieldKind_Month2:
 			value, err = parseMonth2(value, bt)
-		case fieldKind_Day:
+		case fieldKind_Month3:
+			value, err = parseMonth3(value, bt)
+		case fieldKind_Month:
+			value, err = parseMonth(value, bt)
+		case fieldKind_Day2:
 			value, err = parseMonthDay(value, bt)
-		case fieldKind_Hour:
+		case fieldKind_Hour24:
 			value, err = parseHour(value, bt)
-		case fieldKind_Minute:
+		case fieldKind_Minute2:
 			value, err = parseMinute(value, bt)
-		case fieldKind_Second:
+		case fieldKind_Second2:
 			value, err = parseSecond(value, bt)
 		}
 		if err != nil {
@@ -227,10 +307,20 @@ func parseYear2(str string, bt *brokenTime) (string, error) {
 }
 
 func parseMonth(str string, bt *brokenTime) (string, error) {
+	month, str, err := lookup(longMonthNames, str)
+	if err != nil {
+		return str, nil
+	}
+	bt.month = time.Month(month + 1)
 	return str, nil
 }
 
 func parseMonth3(str string, bt *brokenTime) (string, error) {
+	month, str, err := lookup(shortMonthNames, str)
+	if err != nil {
+		return str, nil
+	}
+	bt.month = time.Month(month + 1)
 	return str, nil
 }
 
@@ -251,6 +341,14 @@ func parseMonth2(str string, bt *brokenTime) (tail string, err error) {
 
 func appendMonth2(bs []byte, t time.Time) []byte {
 	return appendInt2(bs, int(t.Month()))
+}
+
+func appendMonth3(bs []byte, t time.Time) []byte {
+	return append(bs, shortMonthNames[int(t.Month())-1]...)
+}
+
+func appendMonth(bs []byte, t time.Time) []byte {
+	return append(bs, longMonthNames[int(t.Month())-1]...)
 }
 
 func parseMonthDay(str string, bt *brokenTime) (string, error) {

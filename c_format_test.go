@@ -18,12 +18,20 @@ var (
 func Test_CFormat_Print(t *testing.T) {
 	expectEq(t, timeformat.C("%Y-%m-%d").Print(testTime), "2016-01-02")
 	expectEq(t, timeformat.C("%Y-%m-%d %H:%M:%S").Print(testTime), "2016-01-02 15:04:05")
+	expectEq(t, timeformat.C("%Y %b %d %H:%M:%S").Print(testTime), "2016 Jan 02 15:04:05")
+	expectEq(t, timeformat.C("%Y %B %d %H:%M:%S").Print(testTime), "2016 January 02 15:04:05")
 }
 
 func TestTimeParse(t *testing.T) {
-	f := timeformat.C("%Y-%m-%d %H:%M:%S")
 	tm1 := time.Date(2021, 9, 3, 0, 0, 0, 0, time.Local)
-	tm, err := f.Parse("2021-09-03 00:00:00")
-	expectNoError(t, err)
-	expectTrue(t, tm1.Equal(tm))
+	test := func(format, str string) {
+		t.Helper()
+		f := timeformat.C(format)
+		tm, err := f.Parse(str)
+		expectNoError(t, err)
+		expectTrue(t, tm1.Equal(tm))
+	}
+	test("%Y-%m-%d %H:%M:%S", "2021-09-03 00:00:00")
+	test("%Y-%b-%d %H:%M:%S", "2021-Sep-03 00:00:00")
+	test("%Y-%B-%d %H:%M:%S", "2021-September-03 00:00:00")
 }
